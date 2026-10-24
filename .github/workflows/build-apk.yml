@@ -9,11 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
+
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+
+      - name: Show project files
+        run: ls -la
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -24,16 +26,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Install Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          cd SGL_Vehicle_Android_Project_v2
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SGL-Vehicle-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: SGL_Vehicle_Android_Project_v2/app/build/outputs/apk/debug/*.apk
