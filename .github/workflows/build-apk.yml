@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,30 +19,43 @@ jobs:
 
       - name: Check ZIP file
         run: |
-          ls -la
-          test -f SGL_Vehicle_Android_Project_v2.zip
-
-      - name: Extract Android project
-        run: |
-          mkdir -p android_project
-          unzip -o SGL_Vehicle_Android_Project_v2.zip -d android_project
-
-      - name: Find Gradle wrapper
-        id: find_project
-        run: |
-          GRADLEW=$(find android_project -type f -name gradlew | head -n 1)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found in ZIP file."
-            echo "ZIP contents:"
-            find android_project -maxdepth 5 -type f | head -200
+          if [ ! -f "SGL_Vehicle_Android_Project_v2.zip" ]; then
+            echo "ERROR: Android project ZIP not found!"
+            ls -la
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$GRADLEW")
-          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+      - name: Extract Android project
+        run: |
+          mkdir -p extracted_project
+          unzip -o SGL_Vehicle_Android_Project_v2.zip \
+            -d extracted_project
 
-          echo "Android project found at: $PROJECT_DIR"
+          echo "Extracted files:"
+          find extracted_project -maxdepth 5 -type f | head -100
+
+      - name: Find Android project
+        run: |
+          SETTINGS_FILE=$(find extracted_project \
+            -type f -name settings.gradle \
+            -print -quit)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            SETTINGS_FILE=$(find extracted_project \
+              -type f -name settings.gradle.kts \
+              -print -quit)
+          fi
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: settings.gradle not found!"
+            find extracted_project -maxdepth 6 -type f
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Android project found: $PROJECT_DIR"
           ls -la "$PROJECT_DIR"
 
       - name: Set up Java
@@ -47,24 +63,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Build APK
-        working-directory: .
-        env:
-          PROJECT_DIR: ${{ steps.find_project.outputs.project_dir }}
         run: |
           cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SGL-Vehicle-APK
-          path: android_project/**/app/build/outputs/apk/debug/*.apk
+          path: extracted_project/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 7
