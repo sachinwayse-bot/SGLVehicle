@@ -9,7 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: SGL_Vehicle_Android_Project_v2 1
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
