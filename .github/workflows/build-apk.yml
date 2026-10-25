@@ -20,7 +20,7 @@ jobs:
       - name: Check ZIP file
         run: |
           if [ ! -f "SGL_Vehicle_Android_Project_v2.zip" ]; then
-            echo "ERROR: Android project ZIP not found!"
+            echo "ERROR: Android project ZIP file not found"
             ls -la
             exit 1
           fi
@@ -28,35 +28,18 @@ jobs:
       - name: Extract Android project
         run: |
           mkdir -p extracted_project
-          unzip -o SGL_Vehicle_Android_Project_v2.zip \
-            -d extracted_project
-
-          echo "Extracted files:"
-          find extracted_project -maxdepth 5 -type f | head -100
+          unzip -o SGL_Vehicle_Android_Project_v2.zip -d extracted_project
 
       - name: Find Android project
         run: |
-          SETTINGS_FILE=$(find extracted_project \
-            -type f -name settings.gradle \
-            -print -quit)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            SETTINGS_FILE=$(find extracted_project \
-              -type f -name settings.gradle.kts \
-              -print -quit)
-          fi
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle not found!"
-            find extracted_project -maxdepth 6 -type f
+          PROJECT_DIR=$(find extracted_project -type f -name settings.gradle -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: settings.gradle not found"
+            find extracted_project -maxdepth 5 -type f
             exit 1
           fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Android project found: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR"
+          echo "Android project: $PROJECT_DIR"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -72,13 +55,13 @@ jobs:
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
-          gradle assembleDebug --stacktrace
+          gradle --version
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: SGL-Vehicle-APK
-          path: extracted_project/**/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
